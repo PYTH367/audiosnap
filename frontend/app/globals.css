@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  * {
+    @apply border-glass-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-canvas text-ink antialiased;
+    background-image: radial-gradient(circle at 15% 0%, rgba(124, 58, 237, 0.16), transparent 55%),
+      radial-gradient(circle at 85% 10%, rgba(34, 211, 238, 0.12), transparent 50%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(34, 211, 238, 0.3);
+  }
+  /* Visible keyboard focus everywhere — never suppressed for mouse users only. */
+  :focus-visible {
+    outline: 2px solid #22d3ee;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Core glass panel used by cards, the URL dropzone, and dashboard widgets. */
+  .glass-panel {
+    @apply bg-glass border border-glass-border backdrop-blur-glass rounded-xl2;
+  }
+
+  .glass-panel-hover {
+    @apply transition-colors duration-300 hover:bg-glass-hover hover:border-white/[0.14];
+  }
+
+  /* Thin gradient rule used as a divider that echoes the spectrum motif sparingly. */
+  .spectrum-rule {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.5), rgba(34, 211, 238, 0.5), transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

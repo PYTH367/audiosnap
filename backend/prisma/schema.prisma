@@ -1,0 +1,111 @@
+// ────────────────────────────────────────────────────────────
+// AudioSnap – Prisma schema
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL
+// ────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourcePlatform {
+  YOUTUBE
+  YOUTUBE_SHORTS
+  INSTAGRAM
+  TIKTOK
+  FACEBOOK
+  TWITTER
+  DIRECT_URL
+  OTHER
+}
+
+enum JobStatus {
+  PENDING
+  ANALYZING
+  CONVERTING
+  TRIMMING
+  COMPLETED
+  FAILED
+}
+
+enum AudioFormat {
+  MP3
+  WAV
+  M4A
+  AAC
+}
+
+// A single browser/device. We don't require login, so history is scoped
+// to a random anonymous client id stored in localStorage and echoed back
+// as the "X-Client-Id" header. This keeps the MVP account-free while still
+// giving each visitor a private history + favorites list.
+model Client {
+  id            String         @id @default(uuid())
+  createdAt     DateTime       @default(now())
+  conversions   Conversion[]
+  searchQueries SearchHistory[]
+}
+
+// One row per source video that has been analyzed. Cached so that pasting
+// the same URL twice doesn't re-hit the extractor / oEmbed endpoint.
+model VideoMetadata {
+  id          String         @id @default(uuid())
+  url         String         @unique
+  platform    SourcePlatform
+  title       String
+  author      String?
+  thumbnail   String?
+  durationSec Int
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  conversions Conversion[]
+}
+
+// One row per conversion (and its optional trim). This is what powers
+// "download history", "favorites", and the dashboard statistics.
+model Conversion {
+  id              String         @id @default(uuid())
+  client          Client         @relation(fields: [clientId], references: [id])
+  clientId        String
+  video           VideoMetadata  @relation(fields: [videoMetadataId], references: [id])
+  videoMetadataId String
+
+  format          AudioFormat
+  bitrateKbps     Int
+  status          JobStatus      @default(PENDING)
+  progress        Int            @default(0) // 0-100, polled by the client
+  errorMessage    String?
+
+  // Trim selection in seconds, null when the full track was exported.
+  trimStartSec    Float?
+  trimEndSec      Float?
+
+  estimatedBytes  Int?
+  actualBytes     Int?
+  outputPath      String?        // resolved by the FFmpeg service, cleaned up after TTL
+  downloadUrl     String?        // signed/temporary URL served by the API
+
+  isFavorite      Boolean        @default(false)
+
+  createdAt       DateTime       @default(now())
+  completedAt      DateTime?
+
+  @@index([clientId, createdAt])
+  @@index([status])
+}
+
+// Lightweight log of search/paste actions so the dashboard can show
+// "search history" independent of whether a conversion was completed.
+model SearchHistory {
+  id        String   @id @default(uuid())
+  client    Client   @relation(fields: [clientId], references: [id])
+  clientId  String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([clientId, createdAt])
+}

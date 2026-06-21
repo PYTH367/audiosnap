@@ -1,0 +1,6 @@
+# Tells Railway's Nixpacks builder to install the `ffmpeg` system package
+# (in addition to Node.js, which it detects automatically from package.json)
+# before running the build/start commands. Without this, `ffmpeg` won't be
+# on PATH and every conversion will fail.
+[phases.setup]
+nixPkgs = ["ffmpeg"]
