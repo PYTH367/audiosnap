@@ -2,8 +2,8 @@
 // Entry point. Boots the Express server AND the BullMQ conversion
 // worker in the same process for simplicity. For higher-throughput
 // production deployments, run `npm run worker` (see package.json) as
-// a separate Railway service so a burst of conversions can't starve
-// the HTTP server's event loop.
+// a separate service so a burst of conversions can't starve the HTTP
+// server's event loop.
 // ────────────────────────────────────────────────────────────
 // Must be the first import — configures fluent-ffmpeg's binary paths
 // before any other module (queue/ffmpeg services) touches it.

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/toast";
+import { AuthProvider } from "@/components/auth-provider";
+import { AuthGate } from "@/components/auth-gate";
 import "./globals.css";
 
 const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", weight: ["500", "700"] });
@@ -17,8 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="min-h-screen font-sans">
-        {children}
-        <Toaster />
+        <AuthProvider>
+          <AuthGate>{children}</AuthGate>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

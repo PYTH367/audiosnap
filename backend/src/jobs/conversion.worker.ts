@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────
-// Optional standalone entry point: run this as its own Railway service
+// Optional standalone entry point: run this as its own service
 // (separate from the HTTP API) when conversion volume is high enough
 // that you want ffmpeg load isolated from the request-handling
 // process. Both `npm run dev`/`npm start` (API + worker combined) and

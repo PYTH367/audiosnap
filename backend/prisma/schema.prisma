@@ -39,10 +39,8 @@ enum AudioFormat {
   AAC
 }
 
-// A single browser/device. We don't require login, so history is scoped
-// to a random anonymous client id stored in localStorage and echoed back
-// as the "X-Client-Id" header. This keeps the MVP account-free while still
-// giving each visitor a private history + favorites list.
+// One GitHub account. The API derives this id from a signed token after
+// sign-in, so history and favorites follow the user across devices.
 model Client {
   id            String         @id @default(uuid())
   createdAt     DateTime       @default(now())

@@ -1,20 +1,23 @@
 // ────────────────────────────────────────────────────────────
 // Every backend call goes through here so there's exactly one place
-// that knows the base URL, attaches the anonymous X-Client-Id header,
+// that knows the base URL, attaches the signed-in API token,
 // and normalizes error handling into a thrown Error with a readable
 // message (components catch this and pass `.message` to the toast).
 // ────────────────────────────────────────────────────────────
-import { getClientId } from "./storage";
+import { getSession } from "next-auth/react";
 import { AudioFormat, Bitrate, ConversionRecord, DashboardStats, VideoMetadata } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = await getSession();
+  if (!session?.apiToken) throw new Error("Sign in with GitHub to continue.");
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-Client-Id": getClientId(),
+      Authorization: `Bearer ${session.apiToken}`,
       ...init?.headers,
     },
   });
@@ -72,8 +75,11 @@ export const api = {
   toggleFavorite: (id: string) => request<ConversionRecord>(`/history/${id}/favorite`, { method: "PATCH" }),
 
   downloadFile: async (id: string, title: string, format: AudioFormat) => {
+    const session = await getSession();
+    if (!session?.apiToken) throw new Error("Sign in with GitHub to continue.");
+
     const res = await fetch(`${BASE_URL}/download/${id}`, {
-      headers: { "X-Client-Id": getClientId() },
+      headers: { Authorization: `Bearer ${session.apiToken}` },
     });
 
     if (!res.ok) {

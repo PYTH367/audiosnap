@@ -1,7 +1,6 @@
-# Optional. FFmpeg is now installed automatically via the
+# Optional. FFmpeg is installed through the
 # @ffmpeg-installer/ffmpeg and @ffprobe-installer/ffprobe npm packages
-# (see src/config/ffmpegBinary.ts), so this file isn't required for
-# the app to work. It's kept here only as a fallback if you ever want
-# Railway to use a system-installed ffmpeg instead.
+# (see src/config/ffmpegBinary.ts). This Nixpacks configuration is only
+# needed if deploying to a provider that uses Nixpacks and system FFmpeg.
 [phases.setup]
 nixPkgs = ["ffmpeg"]

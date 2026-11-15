@@ -7,8 +7,10 @@ Two adapters ship today:
 - **`directUrl.extractor.ts`** — full support (metadata + download +
   conversion) for any publicly accessible direct media URL (a CDN-hosted
   `.mp4`, a self-hosted file, an asset from a service where you have
-  redistribution rights). Metadata comes from `ffprobe`; download is a
-  plain HTTP fetch into `TMP_DIR`.
+  redistribution rights). It downloads to `TMP_DIR`, validating public
+  DNS results, pinning each outbound connection to a validated address,
+  checking every redirect, and enforcing source size and duration limits
+  before FFmpeg/ffprobe processes the local file.
 - **`oembed.service.ts`** — metadata-only preview (title, author,
   thumbnail) for YouTube, TikTok, and Twitter/X, using each platform's
   **official, public oEmbed endpoint** — the same mechanism they use to

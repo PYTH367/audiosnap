@@ -33,8 +33,7 @@ const connection = { url: env.REDIS_URL, maxRetriesPerRequest: null as null };
 
 export const conversionQueue = new Queue<ConversionJobData>("audio-conversion", { connection });
 
-// Concurrency of 2 keeps CPU/ffmpeg load predictable on a single small
-// Railway instance; bump this (and your dyno size) as load grows.
+// Concurrency of 2 keeps CPU/ffmpeg load predictable on a small instance.
 export function startConversionWorker() {
   const worker = new Worker<ConversionJobData>(
     "audio-conversion",

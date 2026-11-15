@@ -43,9 +43,9 @@ Use that for testing the full pipeline.
 - Queue-based background processing (BullMQ + Redis) so conversion
   never blocks the API, with live progress polling and an animated
   progress bar.
-- A no-login dashboard (anonymous per-device id) with history, search,
-  favorites, and stats, with downloads scoped to the anonymous client ID.
-- Rate limiting, input/URL validation (with basic SSRF protection),
+- A GitHub-authenticated dashboard with history, search, favorites,
+  and stats scoped to the signed-in account.
+- Rate limiting, input validation, and DNS-pinned public-URL downloads,
   centralized error handling, and scheduled temp-file cleanup.
 
 ## Prerequisites
@@ -124,12 +124,16 @@ Copy-Item .env.example .env
 ```
 
 On macOS/Linux, use `cp .env.example .env` instead of `Copy-Item`.
-Open `backend/.env` and set at least these values for the Docker setup:
+Open `backend/.env` and set these values for the Docker setup. Generate a
+random 32-byte API token secret with
+`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+and use that same value in the backend and frontend env files:
 
 ```dotenv
 DATABASE_URL="postgresql://audiosnap:audiosnap-local@localhost:5432/audiosnap?schema=public"
 REDIS_URL="redis://localhost:6379"
 CLIENT_ORIGIN="http://localhost:3000"
+API_TOKEN_SECRET="<same-random-secret-in-both-env-files>"
 ```
 
 The `DATABASE_URL` above works with the Docker command in step 2. If
@@ -175,6 +179,11 @@ browser to `http://localhost:4000/api`. Open
 `http://localhost:3000` in your browser. If you change the API address,
 set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to the backend's
 base URL **including `/api`**, then restart the frontend.
+Create a GitHub OAuth App with homepage `http://localhost:3000` and
+callback `http://localhost:3000/api/auth/callback/github`; copy its
+client ID and secret into `GITHUB_ID` and `GITHUB_SECRET`. Generate a
+separate random value for `NEXTAUTH_SECRET`. The app will not allow API
+requests until GitHub sign-in succeeds.
 
 ### 5. Try the app
 
@@ -204,9 +213,13 @@ backend's environment settings:
 - `NEXT_PUBLIC_API_URL`: the deployed backend URL with `/api`, such as
   `https://your-api.example.com/api`.
 
-For Railway, add PostgreSQL and Redis services to the project and
-reference their generated `DATABASE_URL` and `REDIS_URL` variables from
-the backend service. Do not manually invent a database ID or password.
+For a no-cost demo, use [Neon](https://neon.tech/) for PostgreSQL and
+[Redis Cloud](https://redis.io/try-free/) for Redis if their free plans
+are available for your account and region. AudioSnap requires a standard
+Redis connection because BullMQ workers use blocking Redis commands; do
+not use a Redis REST-only endpoint. Never enable a paid plan or add a
+billing method unless you have checked its terms and explicitly chosen
+to pay.
 The checked-in initial migration is under
 `backend/prisma/migrations/`; `npx prisma migrate deploy` applies it (and
 future migrations) to the configured database.
@@ -231,21 +244,27 @@ npm run worker   # optional additional worker-only process
 Both example files contain the configuration used by the app:
 `backend/.env.example` and `frontend/.env.example`. Copy them to
 `backend/.env` and `frontend/.env.local` respectively. The backend
-requires `DATABASE_URL`, `REDIS_URL`, and `CLIENT_ORIGIN`; other backend
-settings have defaults.
+requires `DATABASE_URL`, `REDIS_URL`, `API_TOKEN_SECRET`, and
+`CLIENT_ORIGIN`; set the GitHub OAuth and auth-secret values in the
+frontend environment as well.
 
 | Variable | File | Required/default | What to set |
 |---|---|---|---|
 | `DATABASE_URL` | backend | **Required** | PostgreSQL connection string. Local Docker example: `postgresql://audiosnap:audiosnap-local@localhost:5432/audiosnap?schema=public`. |
 | `REDIS_URL` | backend | **Required** | Redis connection URL. Use the provider's exact URL for hosted Redis. |
+| `API_TOKEN_SECRET` | both | **Required** | Random secret of at least 32 characters; must match in backend and frontend. |
 | `CLIENT_ORIGIN` | backend | **Required** | Frontend origin allowed by CORS, with no path or trailing slash (for example `https://your-app.vercel.app`). |
+| `GITHUB_ID` / `GITHUB_SECRET` | frontend | **Required** | Credentials for a GitHub OAuth App. |
+| `NEXTAUTH_URL` | frontend | **Required in production** | Frontend origin (for example `https://your-app.vercel.app`). |
+| `NEXTAUTH_SECRET` | frontend | **Required** | Random secret of at least 32 characters; keep it private. |
 | `PORT` | backend | `4000` | Port for the Express API. |
 | `NODE_ENV` | backend | `development` | Usually `development` locally and `production` when deployed. |
-| `TMP_DIR` | backend | `./tmp` | Temporary download/conversion files. Use writable storage (for example `/tmp/audiosnap` on Railway). |
+| `TMP_DIR` | backend | `./tmp` | Temporary download/conversion files. Use writable storage (for example `/tmp/audiosnap` on Render). |
 | `TMP_FILE_TTL_MINUTES` | backend | `60` | How long completed output files are retained before cleanup. |
 | `RATE_LIMIT_WINDOW_MINUTES` | backend | `15` | Rate-limit time window. |
 | `RATE_LIMIT_MAX_REQUESTS` | backend | `100` | Requests allowed per window by the standard limiter. |
 | `MAX_VIDEO_DURATION_SECONDS` | backend | `7200` | Maximum supported source duration. |
+| `MAX_SOURCE_SIZE_BYTES` | backend | `268435456` | Maximum downloaded source size (256 MiB). |
 | `MAX_BATCH_URLS` | backend | `10` | Maximum URLs accepted in one batch request. |
 | `METADATA_CACHE_TTL_SECONDS` | backend | `1800` | Metadata cache lifetime. |
 | `NEXT_PUBLIC_API_URL` | frontend | `http://localhost:4000/api` in the example | Backend API base URL, including `/api`. Use the publicly reachable backend URL in production. |
@@ -278,7 +297,8 @@ settings have defaults.
 
 Defined in `backend/prisma/schema.prisma`:
 
-- **Client** — an anonymous per-device id (no login); scopes history.
+- **Client** — a stable GitHub account id from the verified API token;
+  scopes history across devices.
 - **VideoMetadata** — cached preview data per URL (title, thumbnail,
   duration, platform), unique on `url`.
 - **Conversion** — one row per export job: format, bitrate, optional
@@ -290,9 +310,9 @@ Run `npx prisma studio` from `backend/` to browse the data visually.
 
 ## API reference
 
-All endpoints are under `/api` and require an `X-Client-Id` header
-(any reasonably-random string ≥10 chars — the frontend generates a
-UUID once and persists it in `localStorage`).
+All endpoints under `/api` require a short-lived signed Bearer token
+issued to the browser after GitHub sign-in. The health endpoint is
+public and checks the database and Redis queue.
 
 | Method & path | Description |
 |---|---|
@@ -315,16 +335,13 @@ UUID once and persists it in `localStorage`).
 - **Rate limiting**: a generous global limiter plus a stricter one on
   `/analyze`, `/convert`, and `/trim` (`backend/src/middleware/rateLimit.middleware.ts`).
 - **Input/URL validation**: every body/query/param is validated with
-  Zod (`backend/src/middleware/validate.middleware.ts`); URL checks
-  reject unsupported schemes and obvious literal localhost/private
-  addresses (`backend/src/utils/urlValidator.ts`). This is not a
-  complete SSRF defense for arbitrary user-submitted URLs. Restrict
-  access to trusted users until DNS/redirect validation and network
-  egress controls are added.
-- **Anonymous client ids are not an auth system.** Anyone who guesses
-  or copies another client's id header can read that client's history.
-  This is fine for an MVP/demo; if you need real per-user privacy,
-  put a real auth layer (sessions/JWT) in front of `clientId.middleware.ts`.
+  Zod (`backend/src/middleware/validate.middleware.ts`). Direct media
+  downloads reject non-public DNS results, pin outbound connections to
+  the validated IP, revalidate redirects, and enforce source-size and
+  duration limits.
+- **Authentication**: GitHub OAuth protects account-scoped history;
+  API requests require short-lived signed tokens. Configure OAuth secrets
+  only in local ignored env files and provider dashboards.
 - **Temp file cleanup**: downloaded source files and converted outputs
   live in `TMP_DIR` and are deleted on a TTL timer, with a periodic
   sweep that catches anything orphaned by a crash (`cleanup.service.ts`).
@@ -336,56 +353,74 @@ UUID once and persists it in `localStorage`).
 
 ## Deployment
 
-### Backend → Railway
+### Free-tier demo: Render API + Vercel frontend
 
-This is currently an MVP deployment. Do not expose the backend to
-untrusted public traffic until robust SSRF protection and real user
-authentication are added; the anonymous client ID is not authentication.
+This route avoids Railway. It uses a Render web service, Vercel, and
+separate PostgreSQL and Redis providers. Availability and free-tier
+limits can change; confirm each dashboard says **Free** before creating
+anything. Do not add a card or enable a paid instance. Render's free
+service uses temporary local storage and may sleep, so completed audio
+files can disappear on restart and long conversions are not guaranteed.
+This is suitable for a demo, not reliable production hosting.
 
-1. Push this repo to GitHub and create a new Railway project from it,
-   selecting `backend/` as the root directory (or deploy it as its own
-   repo).
-2. Add the **PostgreSQL** and **Redis** plugins from Railway's
-   marketplace — it will inject `DATABASE_URL`/`REDIS_URL` automatically
-   (matching the names this project already expects).
-3. Add a Railway volume mounted at `/data` if you want completed audio
-   files to survive service restarts; set `TMP_DIR=/data/audiosnap`.
-   Without a volume, Railway's temporary filesystem can lose files on
-   restart and users will need to reconvert them.
-4. Set `NODE_ENV=production`, `CLIENT_ORIGIN` to the exact Vercel
-   origin (no trailing slash or path), and the other backend settings
-   from `.env.example`. `DATABASE_URL` and `REDIS_URL` must be the
-   Railway-generated connection URLs.
-5. Build with `npm run build`. Configure `npx prisma migrate deploy`
-   as the **pre-deploy command** so the migration runs with the
-   production database available. Set the start command to `npm start`.
-6. Once deployed, note the public URL (e.g.
-   `https://audiosnap-api.up.railway.app`) — you'll need it for the
-   frontend's `NEXT_PUBLIC_API_URL`.
+#### 1. Create free database and Redis endpoints
+
+Create a free PostgreSQL database on Neon and a standard Redis database
+on Redis Cloud, if the dashboards offer no-cost plans for your account
+and region. Copy their connection strings; Redis must be a `redis://` or
+`rediss://` endpoint compatible with BullMQ, not a REST URL. Keep both
+values private. If either provider asks for payment details or a paid
+plan, stop and do not proceed.
+
+#### 2. Deploy the backend to Render
+
+1. In Render, create a **Blueprint** from this GitHub repository. The
+   checked-in [`render.yaml`](render.yaml) selects the free web-service
+   plan, uses `backend/`, builds the app, applies Prisma migrations, and
+   checks `/health`.
+2. Before confirming creation, verify the plan is **Free** and no paid
+   database, Redis service, or disk is being added.
+3. Set the Blueprint's prompted environment values:
+   - `DATABASE_URL`: your PostgreSQL connection string.
+   - `REDIS_URL`: your Redis TCP connection string.
+   - `CLIENT_ORIGIN`: the exact production Vercel origin, with no path
+     or trailing slash.
+   - `API_TOKEN_SECRET`: a random secret of at least 32 characters.
+4. After the first successful deploy, copy the public Render URL, such
+   as `https://audiosnap-api.onrender.com`.
+
+#### 3. Deploy the frontend to Vercel
+
+1. Import the same GitHub repository into Vercel and set the root
+   directory to `frontend/`.
+2. Set `NEXT_PUBLIC_API_URL` to the Render URL plus `/api`, for example
+   `https://audiosnap-api.onrender.com/api`.
+3. Create a GitHub OAuth App with the deployed frontend as its homepage
+   and callback URL
+   `https://<your-vercel-domain>/api/auth/callback/github`.
+4. Set these Vercel environment variables:
+   - `GITHUB_ID` and `GITHUB_SECRET` from the OAuth App.
+   - `NEXTAUTH_URL` to the exact production Vercel origin.
+   - `NEXTAUTH_SECRET` to a separate random secret of at least 32
+     characters.
+   - `API_TOKEN_SECRET` to the exact same value configured on Render.
+5. Deploy the frontend. Then update Render's `CLIENT_ORIGIN` to that
+   exact Vercel production origin and redeploy/restart the API if needed.
+
+Generate random secrets locally with:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 FFmpeg and ffprobe binaries are installed through the backend npm
-dependencies, so a separate system package installation is not
-required for this setup.
-
-Keep the backend at one replica with this local-disk setup. Multiple
-replicas can process a queued job and serve its download from different
-machines, where the output file is not present. To scale horizontally,
-move converted files to shared object storage and configure a dedicated
-worker/API deployment.
-
-### Frontend → Vercel
-
-1. Import the repo into Vercel, set the root directory to `frontend/`.
-2. Add the environment variable `NEXT_PUBLIC_API_URL` =
-   `https://audiosnap-api.up.railway.app/api` before deploying. Production
-   builds fail immediately if it is missing or does not end with `/api`.
-3. Deploy — Vercel auto-detects Next.js 16 and handles the build.
-4. Back on Railway, set `CLIENT_ORIGIN` to your Vercel domain so CORS
-   allows the deployed frontend to call the API.
+dependencies. Keep one backend instance: output files are local to the
+instance, and this setup does not use a persistent disk or shared object
+storage.
 
 ### Post-deploy checklist
 
-- [ ] `GET https://<railway-url>/health` returns `{ status: "ok" }`
+- [ ] `GET https://<render-url>/health` returns `{ status: "ok" }`
 - [ ] Backend starts without FFmpeg/ffprobe initialization errors
 - [ ] Production `DATABASE_URL`, `REDIS_URL`, and `CLIENT_ORIGIN` are set
 - [ ] A test conversion against a direct `.mp4` URL completes end-to-end

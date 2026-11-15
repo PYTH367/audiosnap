@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────
 // Wires up the Express app: security headers, CORS, body parsing,
-// request logging, the anonymous client-id resolver, all API routes,
+// request logging, the signed-in client resolver, all API routes,
 // and finally the 404 + error handlers (order matters — error
 // middleware must be registered last).
 // ────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ import apiRoutes from "@/routes";
 export function createApp() {
   const app = express();
 
+  if (env.NODE_ENV === "production") app.set("trust proxy", 1);
   app.use(helmet());
   app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "1mb" }));

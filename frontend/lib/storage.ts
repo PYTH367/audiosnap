@@ -1,22 +1,6 @@
 // ────────────────────────────────────────────────────────────
-// AudioSnap doesn't require an account. Instead, each browser gets a
-// random id (persisted in localStorage) that the backend uses to scope
-// history/favorites/stats. This file is the ONLY place that touches
-// localStorage directly — everything else goes through these helpers.
+// Recent URLs are mirrored locally for faster display on page load.
 // ────────────────────────────────────────────────────────────
-const CLIENT_ID_KEY = "audiosnap:clientId";
-
-export function getClientId(): string {
-  if (typeof window === "undefined") return "";
-
-  let id = window.localStorage.getItem(CLIENT_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    window.localStorage.setItem(CLIENT_ID_KEY, id);
-  }
-  return id;
-}
-
 // Recent conversions are also mirrored locally so the dropzone can show
 // "recent" instantly on load without waiting on a network round-trip.
 const RECENTS_KEY = "audiosnap:recents";
