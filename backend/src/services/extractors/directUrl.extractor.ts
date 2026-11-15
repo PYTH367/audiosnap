@@ -7,6 +7,7 @@
 import { createWriteStream } from "fs";
 import { mkdir } from "fs/promises";
 import path from "path";
+import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { v4 as uuid } from "uuid";
 import ffmpeg from "fluent-ffmpeg";
@@ -60,7 +61,7 @@ export class DirectUrlExtractor implements VideoExtractor {
     }
 
     // Node's fetch returns a web ReadableStream; pipe it to disk.
-    const nodeStream = require("stream").Readable.fromWeb(response.body as any);
+    const nodeStream = Readable.fromWeb(response.body);
     await pipeline(nodeStream, createWriteStream(localPath));
 
     const durationSec = await probeDuration(localPath);

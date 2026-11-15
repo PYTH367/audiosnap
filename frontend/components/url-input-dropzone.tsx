@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, FormEvent, DragEvent } from "react";
-import { motion } from "framer-motion";
 import { Link2, Layers, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,6 +18,7 @@ export function UrlInputDropzone({ onSubmit, onSubmitBatch, isLoading }: UrlInpu
   const [batchMode, setBatchMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -42,6 +42,7 @@ export function UrlInputDropzone({ onSubmit, onSubmitBatch, isLoading }: UrlInpu
     if (dropped) {
       setValue((prev) => (batchMode && prev ? `${prev}\n${dropped}` : dropped));
       inputRef.current?.focus();
+      textareaRef.current?.focus();
     }
   }
 
@@ -66,7 +67,7 @@ export function UrlInputDropzone({ onSubmit, onSubmitBatch, isLoading }: UrlInpu
 
           {batchMode ? (
             <textarea
-              ref={inputRef as any}
+              ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={"Paste one URL per line (up to 10)\nhttps://...\nhttps://..."}

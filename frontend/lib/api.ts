@@ -71,5 +71,24 @@ export const api = {
 
   toggleFavorite: (id: string) => request<ConversionRecord>(`/history/${id}/favorite`, { method: "PATCH" }),
 
-  downloadUrl: (id: string) => `${BASE_URL}/download/${id}`,
+  downloadFile: async (id: string, title: string, format: AudioFormat) => {
+    const res = await fetch(`${BASE_URL}/download/${id}`, {
+      headers: { "X-Client-Id": getClientId() },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error ?? "Could not download this file.");
+    }
+
+    const objectUrl = URL.createObjectURL(await res.blob());
+    const anchor = document.createElement("a");
+    const safeTitle = title.replace(/[^\w\s-]/g, "").trim() || "AudioSnap";
+    anchor.href = objectUrl;
+    anchor.download = `${safeTitle}.${format.toLowerCase()}`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  },
 };

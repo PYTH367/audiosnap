@@ -1,6 +1,7 @@
-# Tells Railway's Nixpacks builder to install the `ffmpeg` system package
-# (in addition to Node.js, which it detects automatically from package.json)
-# before running the build/start commands. Without this, `ffmpeg` won't be
-# on PATH and every conversion will fail.
+# Optional. FFmpeg is now installed automatically via the
+# @ffmpeg-installer/ffmpeg and @ffprobe-installer/ffprobe npm packages
+# (see src/config/ffmpegBinary.ts), so this file isn't required for
+# the app to work. It's kept here only as a fallback if you ever want
+# Railway to use a system-installed ffmpeg instead.
 [phases.setup]
 nixPkgs = ["ffmpeg"]

@@ -50,15 +50,26 @@ export async function createConversionJob(
     },
   });
 
-  await conversionQueue.add("convert", {
-    conversionId: conversion.id,
-    sourceUrl: input.url,
-    platform,
-    format: input.format,
-    bitrateKbps: input.bitrateKbps,
-    trimStartSec: trim?.trimStartSec,
-    trimEndSec: trim?.trimEndSec,
-  });
+  try {
+    await conversionQueue.add("convert", {
+      conversionId: conversion.id,
+      sourceUrl: input.url,
+      platform,
+      format: input.format,
+      bitrateKbps: input.bitrateKbps,
+      trimStartSec: trim?.trimStartSec,
+      trimEndSec: trim?.trimEndSec,
+    });
+  } catch (error) {
+    await prisma.conversion.update({
+      where: { id: conversion.id },
+      data: {
+        status: "FAILED",
+        errorMessage: error instanceof Error ? error.message : "Could not add conversion to the queue.",
+      },
+    });
+    throw error;
+  }
 
   return conversion;
 }

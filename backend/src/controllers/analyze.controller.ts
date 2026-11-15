@@ -15,6 +15,19 @@ import { SourcePlatform } from "@prisma/client";
 
 const BITRATES = [128, 192, 256, 320];
 
+function addDownloadEstimates(metadata: Awaited<ReturnType<typeof analyzeOne>>) {
+  const sizeEstimates = BITRATES.map((bitrateKbps) => {
+    const estimatedBytes = estimateAudioBytes(metadata.durationSec, bitrateKbps);
+    return { bitrateKbps, estimatedBytes, estimatedSizeLabel: formatBytes(estimatedBytes) };
+  });
+
+  return {
+    ...metadata,
+    canDownload: metadata.platform === SourcePlatform.DIRECT_URL,
+    sizeEstimates,
+  };
+}
+
 async function analyzeOne(url: string) {
   const cached = getCachedMetadata(url);
   if (cached) return cached;
@@ -23,8 +36,6 @@ async function analyzeOne(url: string) {
   const platform = detectPlatform(parsed);
   const extractor = getExtractor(platform);
   const metadata = await extractor.fetchMetadata(url);
-
-  setCachedMetadata(url, metadata);
 
   // Upsert so repeated analyses of the same URL update freshness
   // instead of accumulating duplicate rows.
@@ -46,6 +57,8 @@ async function analyzeOne(url: string) {
     },
   });
 
+  setCachedMetadata(url, metadata);
+
   return metadata;
 }
 
@@ -56,17 +69,7 @@ export async function analyzeController(req: Request, res: Response) {
 
   const metadata = await analyzeOne(url);
 
-  const sizeEstimates = BITRATES.map((bitrateKbps) => ({
-    bitrateKbps,
-    estimatedBytes: estimateAudioBytes(metadata.durationSec, bitrateKbps),
-    estimatedSizeLabel: formatBytes(estimateAudioBytes(metadata.durationSec, bitrateKbps)),
-  }));
-
-  res.json({
-    ...metadata,
-    canDownload: metadata.platform === SourcePlatform.DIRECT_URL,
-    sizeEstimates,
-  });
+  res.json(addDownloadEstimates(metadata));
 }
 
 export async function batchAnalyzeController(req: Request, res: Response) {
@@ -81,7 +84,7 @@ export async function batchAnalyzeController(req: Request, res: Response) {
         return {
           url: urls[i],
           success: true,
-          metadata: { ...metadata, canDownload: metadata.platform === SourcePlatform.DIRECT_URL },
+          metadata: addDownloadEstimates(metadata),
         };
       }
       return { url: urls[i], success: false, error: (result.reason as Error).message };

@@ -8,7 +8,6 @@
 import { Request, Response } from "express";
 import { createReadStream } from "fs";
 import { stat } from "fs/promises";
-import path from "path";
 import { prisma } from "@/config/db";
 import { NotFoundError, AppError } from "@/middleware/error.middleware";
 import { cancelScheduledCleanup, scheduleCleanup } from "@/services/cleanup.service";

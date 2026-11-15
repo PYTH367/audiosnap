@@ -9,9 +9,9 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
-  CLIENT_ORIGIN: z.string().default("http://localhost:3000"),
+  CLIENT_ORIGIN: z.string().url(),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string().url(),
   TMP_DIR: z.string().default("./tmp"),
   TMP_FILE_TTL_MINUTES: z.coerce.number().default(60),
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),

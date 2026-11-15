@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { DashboardStats } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
+import { pushToast } from "@/hooks/use-toast";
 
 const STAT_ICONS = [Music2, CheckCircle2, Star, HardDrive];
 
@@ -14,7 +15,9 @@ export function DashboardStatsPanel() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
-    api.getStats().then(setStats).catch(() => undefined);
+    api.getStats().then(setStats).catch((err: Error) => {
+      pushToast({ title: "Couldn't load dashboard stats", description: err.message, variant: "error" });
+    });
   }, []);
 
   const cards = stats
@@ -29,7 +32,7 @@ export function DashboardStatsPanel() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(stats ? cards : Array.from({ length: 4 })).map((card, i) => {
+        {(stats ? cards : Array.from({ length: 4 }, () => null)).map((card, i) => {
           const Icon = STAT_ICONS[i];
           return (
             <Card key={i} className="flex flex-col gap-2">
@@ -39,9 +42,9 @@ export function DashboardStatsPanel() {
                 animate={{ opacity: 1 }}
                 className="font-display text-xl font-bold"
               >
-                {card ? (card as any).value : "—"}
+                {card?.value ?? "—"}
               </motion.span>
-              <span className="text-xs text-ink-faint">{card ? (card as any).label : "Loading…"}</span>
+              <span className="text-xs text-ink-faint">{card?.label ?? "Loading…"}</span>
             </Card>
           );
         })}

@@ -35,6 +35,7 @@ export async function toggleFavorite(conversionId: string, clientId: string) {
   return prisma.conversion.update({
     where: { id: conversionId },
     data: { isFavorite: !existing.isFavorite },
+    include: { video: true },
   });
 }
 

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { DashboardStatsPanel } from "@/components/dashboard-stats";
 import { DownloadHistory } from "@/components/download-history";
-import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   return (

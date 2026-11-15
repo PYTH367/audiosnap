@@ -68,8 +68,8 @@ export function MetadataCard({ metadata }: { metadata: VideoMetadata }) {
 
         {!metadata.canDownload && (
           <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-            AudioSnap can preview this link, but won't extract audio from {PLATFORM_LABELS[metadata.platform]} —
-            that platform's terms only allow downloads through their own app. Paste a direct video file URL to
+            AudioSnap can preview this link, but won&apos;t extract audio from {PLATFORM_LABELS[metadata.platform]} —
+            that platform&apos;s terms only allow downloads through their own app. Paste a direct video file URL to
             run a full conversion.
           </p>
         )}

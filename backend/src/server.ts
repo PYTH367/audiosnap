@@ -5,6 +5,10 @@
 // a separate Railway service so a burst of conversions can't starve
 // the HTTP server's event loop.
 // ────────────────────────────────────────────────────────────
+// Must be the first import — configures fluent-ffmpeg's binary paths
+// before any other module (queue/ffmpeg services) touches it.
+import "@/config/ffmpegBinary";
+
 import { mkdir } from "fs/promises";
 import { env } from "@/config/env";
 import { createApp } from "@/app";

@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, Trash2, Download, Copy, Share2, Search, Music2 } from "lucide-react";
+import { Star, Trash2, Download, Search, Music2 } from "lucide-react";
 import { Input } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { ConversionRecord } from "@/lib/types";
 import { formatBytes, formatRelativeTime, formatDuration, cn } from "@/lib/utils";
@@ -16,50 +15,52 @@ export function DownloadHistory() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  async function load(query?: string) {
-    setLoading(true);
-    try {
-      const { history } = await api.getHistory(query);
-      setItems(history);
-    } catch {
-      pushToast({ title: "Couldn't load history", variant: "error" });
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    load();
-  }, []);
+    let active = true;
+    const timeout = setTimeout(() => {
+      api
+        .getHistory(search || undefined)
+        .then(({ history }) => {
+          if (active) setItems(history);
+        })
+        .catch((err: Error) => {
+          if (active) pushToast({ title: "Couldn't load history", description: err.message, variant: "error" });
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, search ? 350 : 0);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => load(search || undefined), 350);
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
   }, [search]);
 
   async function handleFavorite(id: string) {
-    const updated = await api.toggleFavorite(id);
-    setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    try {
+      const updated = await api.toggleFavorite(id);
+      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    } catch (err) {
+      pushToast({
+        title: "Couldn't update favorite",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "error",
+      });
+    }
   }
 
   async function handleDelete(id: string) {
-    await api.deleteHistoryItem(id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    pushToast({ title: "Removed from history" });
-  }
-
-  function handleCopyLink(id: string) {
-    navigator.clipboard.writeText(window.location.origin + api.downloadUrl(id));
-    pushToast({ title: "Link copied", description: "Paste it anywhere to share this download.", variant: "success" });
-  }
-
-  async function handleShare(record: ConversionRecord) {
-    const url = window.location.origin + api.downloadUrl(record.id);
-    if (navigator.share) {
-      await navigator.share({ title: record.video.title, url }).catch(() => undefined);
-    } else {
-      handleCopyLink(record.id);
+    try {
+      await api.deleteHistoryItem(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      pushToast({ title: "Removed from history" });
+    } catch (err) {
+      pushToast({
+        title: "Couldn't remove conversion",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "error",
+      });
     }
   }
 
@@ -120,16 +121,18 @@ export function DownloadHistory() {
                   >
                     <Star className="h-4 w-4" fill={item.isFavorite ? "currentColor" : "none"} />
                   </button>
-                  <button onClick={() => handleCopyLink(item.id)} aria-label="Copy link" className="rounded-md p-1.5 text-ink-faint hover:bg-white/5 hover:text-ink">
-                    <Copy className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => handleShare(item)} aria-label="Share" className="rounded-md p-1.5 text-ink-faint hover:bg-white/5 hover:text-ink">
-                    <Share2 className="h-4 w-4" />
-                  </button>
                   {item.status === "COMPLETED" && (
-                    <a href={api.downloadUrl(item.id)} download aria-label="Download" className="rounded-md p-1.5 text-ink-faint hover:bg-white/5 hover:text-cyan">
+                    <button
+                      onClick={() =>
+                        api.downloadFile(item.id, item.video.title, item.format).catch((err: Error) =>
+                          pushToast({ title: "Download failed", description: err.message, variant: "error" })
+                        )
+                      }
+                      aria-label="Download"
+                      className="rounded-md p-1.5 text-ink-faint hover:bg-white/5 hover:text-cyan"
+                    >
                       <Download className="h-4 w-4" />
-                    </a>
+                    </button>
                   )}
                   <button onClick={() => handleDelete(item.id)} aria-label="Delete" className="rounded-md p-1.5 text-ink-faint hover:bg-danger/10 hover:text-danger">
                     <Trash2 className="h-4 w-4" />

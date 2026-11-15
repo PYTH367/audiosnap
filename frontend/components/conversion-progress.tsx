@@ -48,8 +48,13 @@ export function ConversionProgress({ conversionId, fileLabel, onComplete }: Conv
             }
           }
         }
-      } catch {
+      } catch (err) {
         clearInterval(pollRef.current);
+        pushToast({
+          title: "Couldn't check conversion status",
+          description: err instanceof Error ? err.message : "Please refresh and check your history.",
+          variant: "error",
+        });
       }
     }, 1200);
 
@@ -84,11 +89,17 @@ export function ConversionProgress({ conversionId, fileLabel, onComplete }: Conv
           <span className="font-mono text-xs text-ink-faint">
             {record.actualBytes ? formatBytes(record.actualBytes) : "Ready"}
           </span>
-          <a href={api.downloadUrl(record.id)} download>
-            <Button size="sm" variant="primary">
-              <Download className="h-3.5 w-3.5" /> Download
-            </Button>
-          </a>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() =>
+              api.downloadFile(record.id, fileLabel, record.format).catch((err: Error) =>
+                pushToast({ title: "Download failed", description: err.message, variant: "error" })
+              )
+            }
+          >
+            <Download className="h-3.5 w-3.5" /> Download
+          </Button>
         </div>
       )}
     </motion.div>

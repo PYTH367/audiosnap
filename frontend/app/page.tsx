@@ -21,7 +21,9 @@ import { AudioFormat, Bitrate, VideoMetadata } from "@/lib/types";
 export default function HomePage() {
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [batchResults, setBatchResults] = useState<any[] | null>(null);
+  const [batchResults, setBatchResults] = useState<
+    Awaited<ReturnType<typeof api.analyzeBatch>>["results"] | null
+  >(null);
 
   const [format, setFormat] = useState<AudioFormat>("MP3");
   const [bitrate, setBitrate] = useState<Bitrate>(192);
@@ -141,6 +143,7 @@ export default function HomePage() {
 
                   {trimEnabled && (
                     <WaveformTrimmer
+                      key={metadata.url}
                       sourceUrl={metadata.url}
                       durationSec={metadata.durationSec}
                       onTrimChange={handleTrimChange}

@@ -6,6 +6,10 @@
 // `npm run worker` (worker only) are valid deployment shapes — pick
 // based on your traffic.
 // ────────────────────────────────────────────────────────────
+// Must be the first import — configures fluent-ffmpeg's binary paths
+// before any other module (queue/ffmpeg services) touches it.
+import "@/config/ffmpegBinary";
+
 import { mkdir } from "fs/promises";
 import { env } from "@/config/env";
 import { startConversionWorker } from "@/services/queue.service";

@@ -35,10 +35,6 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
   }, [sourceUrl]);
 
   useEffect(() => {
-    setEnd(durationSec);
-  }, [durationSec]);
-
-  useEffect(() => {
     onTrimChange(start, end);
   }, [start, end, onTrimChange]);
 
@@ -49,34 +45,26 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
   }, []);
 
-  const handlePointerMove = useCallback(
-    (e: PointerEvent) => {
-      if (!draggingHandle.current) return;
-      const pct = pctFromClientX(e.clientX);
-      const seconds = pct * durationSec;
+  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!draggingHandle.current) return;
+    const pct = pctFromClientX(e.clientX);
+    const seconds = pct * durationSec;
 
-      if (draggingHandle.current === "start") {
-        setStart(Math.min(seconds, end - 0.5));
-      } else {
-        setEnd(Math.max(seconds, start + 0.5));
-      }
-    },
-    [durationSec, start, end, pctFromClientX]
-  );
+    if (draggingHandle.current === "start") {
+      setStart(Math.min(seconds, end - 0.5));
+    } else {
+      setEnd(Math.max(seconds, start + 0.5));
+    }
+  }
 
-  const handlePointerUp = useCallback(() => {
+  function handlePointerUp() {
     draggingHandle.current = null;
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-  }, [handlePointerMove]);
+  }
 
-  function startDrag(handle: "start" | "end") {
-    return (e: ReactPointerEvent) => {
-      e.preventDefault();
-      draggingHandle.current = handle;
-      window.addEventListener("pointermove", handlePointerMove);
-      window.addEventListener("pointerup", handlePointerUp);
-    };
+  function startDrag(handle: "start" | "end", e: ReactPointerEvent) {
+    e.preventDefault();
+    draggingHandle.current = handle;
+    e.currentTarget.parentElement?.setPointerCapture(e.pointerId);
   }
 
   function togglePreview() {
@@ -90,9 +78,14 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
     }
 
     audio.currentTime = start;
-    audio.play().catch(() =>
-      pushToast({ title: "Preview unavailable", description: "This source can't be streamed directly in-browser.", variant: "error" })
-    );
+    audio.play().catch(() => {
+      setIsPlaying(false);
+      pushToast({
+        title: "Preview unavailable",
+        description: "This source can't be streamed directly in-browser.",
+        variant: "error",
+      });
+    });
     setIsPlaying(true);
   }
 
@@ -125,6 +118,9 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
       ) : (
         <div
           ref={trackRef}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           className="relative h-20 w-full select-none overflow-hidden rounded-lg bg-black/30"
         >
           {/* Waveform bars */}
@@ -153,14 +149,14 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
 
           {/* Drag handles */}
           <div
-            onPointerDown={startDrag("start")}
+            onPointerDown={(e) => startDrag("start", e)}
             className="absolute inset-y-0 z-10 flex w-3 -translate-x-1/2 cursor-ew-resize items-center justify-center"
             style={{ left: `${startPct}%` }}
           >
             <div className="h-full w-1 rounded-full bg-spectrum shadow-lg" />
           </div>
           <div
-            onPointerDown={startDrag("end")}
+            onPointerDown={(e) => startDrag("end", e)}
             className="absolute inset-y-0 z-10 flex w-3 -translate-x-1/2 cursor-ew-resize items-center justify-center"
             style={{ left: `${endPct}%` }}
           >
@@ -177,8 +173,13 @@ export function WaveformTrimmer({ sourceUrl, durationSec, onTrimChange }: Wavefo
         <span className="font-mono text-[11px] text-ink-faint">Drag the handles for sample-accurate trims</span>
       </div>
 
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} src={sourceUrl} onTimeUpdate={handleTimeUpdate} className="hidden" />
+      <audio
+        ref={audioRef}
+        src={sourceUrl}
+        onTimeUpdate={handleTimeUpdate}
+        aria-label="Audio preview"
+        className="hidden"
+      />
     </div>
   );
 }
