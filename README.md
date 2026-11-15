@@ -214,12 +214,13 @@ backend's environment settings:
   `https://your-api.example.com/api`.
 
 For a no-cost demo, use [Neon](https://neon.tech/) for PostgreSQL and
-[Redis Cloud](https://redis.io/try-free/) for Redis if their free plans
-are available for your account and region. AudioSnap requires a standard
-Redis connection because BullMQ workers use blocking Redis commands; do
-not use a Redis REST-only endpoint. Never enable a paid plan or add a
-billing method unless you have checked its terms and explicitly chosen
-to pay.
+[Upstash Redis](https://upstash.com/pricing/redis) if its free plan is
+available for your account and region. AudioSnap requires the standard
+Redis protocol connection; do not use the REST URL. Upstash's current
+free tier lists 250 MB and 500,000 commands per month, and BullMQ can
+consume commands even while idle, so the queue may stop working if it
+reaches the free quota. Confirm current limits in the provider dashboard.
+Do not add a payment method or upgrade to a pay-as-you-go or fixed plan.
 The checked-in initial migration is under
 `backend/prisma/migrations/`; `npx prisma migrate deploy` applies it (and
 future migrations) to the configured database.
@@ -365,12 +366,13 @@ This is suitable for a demo, not reliable production hosting.
 
 #### 1. Create free database and Redis endpoints
 
-Create a free PostgreSQL database on Neon and a standard Redis database
-on Redis Cloud, if the dashboards offer no-cost plans for your account
-and region. Copy their connection strings; Redis must be a `redis://` or
-`rediss://` endpoint compatible with BullMQ, not a REST URL. Keep both
-values private. If either provider asks for payment details or a paid
-plan, stop and do not proceed.
+Create a free PostgreSQL database on Neon and a free Redis database on
+Upstash. Use the same or nearby region for the backend and Redis where
+possible. Copy their connection strings; Redis must be the `redis://` or
+`rediss://` endpoint compatible with BullMQ, not the REST URL. Keep both
+values private. For Neon, use a direct PostgreSQL connection for Prisma
+migrations. If either provider asks for payment details or a paid plan,
+stop and do not proceed.
 
 #### 2. Deploy the backend to Render
 

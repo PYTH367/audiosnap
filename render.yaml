@@ -3,6 +3,7 @@ services:
     name: audiosnap-api
     runtime: node
     plan: free
+    region: virginia
     rootDir: backend
     buildCommand: npm ci && npm run prisma:generate && npm run build
     startCommand: npm run prisma:deploy && npm start
