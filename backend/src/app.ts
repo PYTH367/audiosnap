@@ -13,6 +13,8 @@ import { standardLimiter } from "@/middleware/rateLimit.middleware";
 import { clientIdMiddleware } from "@/middleware/clientId.middleware";
 import { errorMiddleware, notFoundMiddleware } from "@/middleware/error.middleware";
 import { asyncHandler } from "@/utils/asyncHandler";
+import { prisma } from "@/config/db";
+import { conversionQueue } from "@/services/queue.service";
 import apiRoutes from "@/routes";
 
 export function createApp() {
@@ -24,8 +26,15 @@ export function createApp() {
   app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
   app.use(standardLimiter);
 
-  // Health check — no client id required, used by Railway's healthcheck.
-  app.get("/health", (_req, res) => res.json({ status: "ok", uptime: process.uptime() }));
+  // Readiness check — no client id required; verify database and Redis before reporting healthy.
+  app.get(
+    "/health",
+    asyncHandler(async (_req, res) => {
+      await prisma.$queryRaw`SELECT 1`;
+      await conversionQueue.waitUntilReady();
+      res.json({ status: "ok", uptime: process.uptime() });
+    })
+  );
 
   app.use("/api", asyncHandler(clientIdMiddleware), apiRoutes);
 

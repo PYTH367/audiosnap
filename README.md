@@ -315,10 +315,12 @@ UUID once and persists it in `localStorage`).
 - **Rate limiting**: a generous global limiter plus a stricter one on
   `/analyze`, `/convert`, and `/trim` (`backend/src/middleware/rateLimit.middleware.ts`).
 - **Input/URL validation**: every body/query/param is validated with
-  Zod (`backend/src/middleware/validate.middleware.ts`); URLs are
-  checked for scheme and rejected if they resolve to localhost/private
-  IP ranges before the server makes any outbound request to them
-  (`backend/src/utils/urlValidator.ts`).
+  Zod (`backend/src/middleware/validate.middleware.ts`); URL checks
+  reject unsupported schemes and obvious literal localhost/private
+  addresses (`backend/src/utils/urlValidator.ts`). This is not a
+  complete SSRF defense for arbitrary user-submitted URLs. Restrict
+  access to trusted users until DNS/redirect validation and network
+  egress controls are added.
 - **Anonymous client ids are not an auth system.** Anyone who guesses
   or copies another client's id header can read that client's history.
   This is fine for an MVP/demo; if you need real per-user privacy,
@@ -335,6 +337,10 @@ UUID once and persists it in `localStorage`).
 ## Deployment
 
 ### Backend → Railway
+
+This is currently an MVP deployment. Do not expose the backend to
+untrusted public traffic until robust SSRF protection and real user
+authentication are added; the anonymous client ID is not authentication.
 
 1. Push this repo to GitHub and create a new Railway project from it,
    selecting `backend/` as the root directory (or deploy it as its own
