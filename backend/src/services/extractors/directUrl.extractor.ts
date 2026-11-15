@@ -5,7 +5,7 @@
 // supports the full pipeline: metadata + download + conversion.
 // ────────────────────────────────────────────────────────────
 import { createWriteStream } from "fs";
-import { mkdir } from "fs/promises";
+import { mkdir, unlink } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
@@ -20,7 +20,18 @@ function probeDuration(filePathOrUrl: string): Promise<number> {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePathOrUrl, (err, data) => {
       if (err) return reject(err);
-      resolve(Math.round(data.format.duration ?? 0));
+      const duration = data.format.duration;
+      if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+        return reject(new UnsupportedSourceError("Could not determine a valid video duration."));
+      }
+      if (duration > env.MAX_VIDEO_DURATION_SECONDS) {
+        return reject(
+          new UnsupportedSourceError(
+            `Videos must be ${env.MAX_VIDEO_DURATION_SECONDS} seconds or shorter.`
+          )
+        );
+      }
+      resolve(Math.max(1, Math.round(duration)));
     });
   });
 }
@@ -48,23 +59,28 @@ export class DirectUrlExtractor implements VideoExtractor {
     await mkdir(env.TMP_DIR, { recursive: true });
     const localPath = path.join(env.TMP_DIR, `${uuid()}-source${path.extname(new URL(url).pathname) || ".mp4"}`);
 
-    const response = await fetch(url);
-    if (!response.ok || !response.body) {
-      throw new UnsupportedSourceError(`Could not fetch the video (HTTP ${response.status}).`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok || !response.body) {
+        throw new UnsupportedSourceError(`Could not fetch the video (HTTP ${response.status}).`);
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.startsWith("video/") && !contentType.startsWith("application/octet-stream")) {
+        throw new UnsupportedSourceError(
+          "That URL doesn't appear to point directly at a video file. Direct links must serve video content."
+        );
+      }
+
+      // Node's fetch returns a web ReadableStream; pipe it to disk.
+      const nodeStream = Readable.fromWeb(response.body);
+      await pipeline(nodeStream, createWriteStream(localPath));
+
+      const durationSec = await probeDuration(localPath);
+      return { localPath, durationSec };
+    } catch (error) {
+      await unlink(localPath).catch(() => undefined);
+      throw error;
     }
-
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("video/") && !contentType.startsWith("application/octet-stream")) {
-      throw new UnsupportedSourceError(
-        "That URL doesn't appear to point directly at a video file. Direct links must serve video content."
-      );
-    }
-
-    // Node's fetch returns a web ReadableStream; pipe it to disk.
-    const nodeStream = Readable.fromWeb(response.body);
-    await pipeline(nodeStream, createWriteStream(localPath));
-
-    const durationSec = await probeDuration(localPath);
-    return { localPath, durationSec };
   }
 }

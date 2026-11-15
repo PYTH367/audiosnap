@@ -4,13 +4,14 @@
 // each endpoint's request shape.
 // ────────────────────────────────────────────────────────────
 import { z } from "zod";
+import { env } from "@/config/env";
 
 export const analyzeSchema = z.object({
   url: z.string().url(),
 });
 
 export const batchAnalyzeSchema = z.object({
-  urls: z.array(z.string().url()).min(1).max(10),
+  urls: z.array(z.string().url()).min(1).max(env.MAX_BATCH_URLS),
 });
 
 export const audioFormatEnum = z.enum(["MP3", "WAV", "M4A", "AAC"]);
